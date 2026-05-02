@@ -42,7 +42,7 @@ router.post(
       .withMessage("L'email est requis")
       .trim()
       .isEmail()
-      .withMessage("L'email n'est pas valide"),
+      .withMessage("Utilisez un format d'email valide : jean@mail.com"),
     body("password").notEmpty().withMessage("Le mot de passe est requis"),
     //.isLength({ min: 6 }).withMessage("6 caractères minimum"),
   ],
@@ -91,7 +91,7 @@ router.post(
       .withMessage("L'email est requis")
       .trim()
       .isEmail()
-      .withMessage("L'email n'est pas valide"),
+      .withMessage("Utilisez un format d'email valide : jean@mail.com"),
     body("password").notEmpty().withMessage("Le mot de passe est requis"),
     //.isLength({ min: 6 }).withMessage("6 caractères minimum"),
   ],
