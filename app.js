@@ -4,14 +4,7 @@ const path = require("path");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const cors = require("cors");
-const webpush = require("web-push");
 const mongoose = require("mongoose");
-
-webpush.setVapidDetails(
-  "mailto:romainauthier@outlook.com",
-  process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY,
-  process.env.EXPO_PUBLIC_VAPID_PRIVATE_KEY,
-);
 
 const authLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // fenêtre de 10 minutes
@@ -24,15 +17,15 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const usersRouter = require("./routes/users");
-const notifRouter = require("./routes/notifications");
+const bookingsRouter = require("./routes/bookings");
+const restaurantsRouter = require("./routes/restaurants");
 
 const app = express();
 require("./models/connection");
 
 app.use(logger("dev"));
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 app.use(
@@ -51,10 +44,9 @@ app.use(
   }),
 );
 
-app.use("/users/signin", authLimiter);
-app.use("/users/signup", authLimiter);
-app.use("/users", usersRouter);
-app.use("/notifications", notifRouter);
+app.use("/bookings/new", authLimiter);
+app.use("/bookings", bookingsRouter);
+app.use("/restaurants", restaurantsRouter);
 
 app.get("/health", async (req, res) => {
   const state = mongoose.connection.readyState;
