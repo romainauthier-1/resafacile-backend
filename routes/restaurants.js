@@ -2,6 +2,7 @@ var express = require("express");
 var router = express.Router();
 const bookings = require("../models/bookings");
 const restaurants = require("../models/restaurants");
+const bcrypt = require("bcrypt");
 const { body, validationResult } = require("express-validator");
 
 const validate = (req, res, next) => {
@@ -21,7 +22,11 @@ router.get("/all/", async (req, res) => {
     const allRestaurants = await restaurants.find();
 
     if (allRestaurants.length > 0) {
-      res.status(200).json({ result: true, allRestaurants });
+      res.status(200).json({
+        result: true,
+        nbOfRestaurants: allRestaurants.length,
+        allRestaurants,
+      });
     } else {
       res.status(404).json({
         result: false,
@@ -108,7 +113,51 @@ router.post(
   },
 );
 
-// DELETE Annuler une réservation
+// POST Se connecter en tant que restaurant
+router.post(
+  "/login",
+  [
+    body("email")
+      .notEmpty()
+      .withMessage("Merci de saisir un email")
+      .trim()
+      .isEmail()
+      .withMessage("Utilisez un format d'email valide : jean@mail.com"),
+    body("password").notEmpty().withMessage("Merci de saisir un mot de passe"),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      const restaurant = await restaurants.findOne({
+        email: email.toLowerCase(),
+      });
+
+      if (!restaurant) {
+        return res
+          .status(404)
+          .json({
+            result: false,
+            message: "Aucun restaurant trouvé avec cet email.",
+          });
+      }
+
+      if (restaurant && (await bcrypt.compare(password, restaurant.password))) {
+        res.status(200).json({
+          result: true,
+          message: `Bienvenue ${restaurant.name} !`,
+          restaurantId: restaurant._id,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ result: false, message: err.message });
+    }
+  },
+);
+
+// DELETE Supprimer un restaurant
 router.delete("/delete/:restaurandId", async (req, res) => {
   try {
     const { restaurandId } = req.params;

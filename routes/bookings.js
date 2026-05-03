@@ -25,7 +25,9 @@ router.get("/all/:restaurantId", async (req, res) => {
       .populate("restaurant", "name");
 
     if (allBookings.length > 0) {
-      res.status(200).json({ result: true, allBookings });
+      res
+        .status(200)
+        .json({ result: true, nbOfBookings: allBookings.length, allBookings });
     } else {
       res.status(404).json({
         result: false,
@@ -54,13 +56,9 @@ router.post(
       .withMessage(
         "Nous avons besoin de votre numéro de téléphone pour confirmer votre réservation.",
       ),
-    body("date")
+    body("dateTime")
       .notEmpty()
-      .withMessage("Merci d'indiquer une date valide")
-      .trim(),
-    body("time")
-      .notEmpty()
-      .withMessage("Merci d'indiquer une heure de venue")
+      .withMessage("Merci d'indiquer la date et l'heure de votre venue.")
       .trim(),
     body("nbPax")
       .notEmpty()
@@ -70,9 +68,43 @@ router.post(
   validate,
   async (req, res) => {
     try {
-      const { firstName, lastName, email, phoneNumber, date, time, nbPax } =
-        req.body;
+      const {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        dateTime,
+        nbPax,
+        occasion,
+      } = req.body;
       const { restaurantId } = req.params;
+
+      if (new Date(dateTime) < new Date()) {
+        return res.status(400).json({
+          result: false,
+          message:
+            "La date et l'heure de la réservation ne peuvent pas être antérieures à la date actuelle.",
+        });
+      }
+
+      const checkBooking = await bookings.findOne({
+        customer: {
+          firstName: firstName.toLowerCase(),
+          lastName: lastName.toLowerCase(),
+          email: email.toLowerCase(),
+          phoneNumber,
+        },
+        dateTime: new Date(dateTime),
+        restaurant: restaurantId,
+      });
+
+      if (checkBooking) {
+        return res.status(400).json({
+          result: false,
+          message:
+            "Une réservation existe déjà à ce nom pour la date choisie. Si vous souhaitez modifier ou annuler votre réservation, merci de nous contacter.",
+        });
+      }
 
       const restaurant = await restaurants.findById(restaurantId);
 
@@ -83,12 +115,14 @@ router.post(
       }
 
       const newBooking = new bookings({
-        firstName: firstName.toLowerCase(),
-        lastName: lastName.toLowerCase(),
-        email: email.toLowerCase(),
-        phoneNumber,
-        date,
-        time,
+        customer: {
+          firstName: firstName.toLowerCase(),
+          lastName: lastName.toLowerCase(),
+          email: email.toLowerCase(),
+          phoneNumber,
+        },
+        dateTime: new Date(dateTime),
+        occasion,
         nbPax,
         restaurant: restaurantId,
       });
@@ -146,7 +180,7 @@ router.put("/update/:bookingId", async (req, res) => {
         nbPax,
         occasion,
       },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (updatedBooking) {

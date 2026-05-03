@@ -8,6 +8,7 @@ const restaurantSchema = new mongoose.Schema({
   country: { type: String, required: true },
   phoneNumber: { type: String, required: true },
   email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
   openingDays: {
     type: [String],
     enum: [
@@ -26,6 +27,7 @@ const restaurantSchema = new mongoose.Schema({
       name: { type: String, required: true },
       startTime: { type: Number, required: true },
       endTime: { type: Number, required: true },
+      gap: { type: Number, required: true },
     },
   ],
 });
