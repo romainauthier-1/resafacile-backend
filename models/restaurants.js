@@ -28,6 +28,19 @@ const restaurantSchema = new mongoose.Schema({
       startTime: { type: Number, required: true },
       endTime: { type: Number, required: true },
       gap: { type: Number, required: true },
+      dayOfWeek: {
+        type: [String],
+        enum: [
+          "lundi",
+          "mardi",
+          "mercredi",
+          "jeudi",
+          "vendredi",
+          "samedi",
+          "dimanche",
+        ],
+      },
+      isOpen: { type: Boolean, default: true },
     },
   ],
 });
