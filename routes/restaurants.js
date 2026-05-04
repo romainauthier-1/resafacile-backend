@@ -17,7 +17,7 @@ const validate = (req, res, next) => {
 };
 
 // GET la liste des restaurants
-router.get("/all/", async (req, res) => {
+router.get("/all", async (req, res) => {
   try {
     const allRestaurants = await restaurants.find();
 
@@ -38,15 +38,75 @@ router.get("/all/", async (req, res) => {
   }
 });
 
+// GET Obtenir toutes les informations du restaurant avec son siret
+router.get("/:siret", async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://api.insee.fr/api-sirene/3.11/siret/${req.params.siret}`,
+      {
+        headers: { "X-INSEE-Api-Key-Integration": process.env.SIRENE_API_KEY },
+      },
+    );
+
+    const data = await response.json();
+
+    if (data.header.statut !== 200) {
+      res.json({
+        result: false,
+        message: response.header.message,
+      });
+    }
+
+    const restaurant = {
+      siret: data.etablissement.siret,
+      businessCommercialName:
+        data.etablissement.uniteLegale.denominationUniteLegale,
+      businessAddress: {
+        number:
+          data.etablissement.adresseEtablissement.numeroVoieEtablissement || "",
+        streetType:
+          data.etablissement.adresseEtablissement.typeVoieEtablissement || "",
+        streetName:
+          data.etablissement.adresseEtablissement.libelleVoieEtablissement ||
+          "",
+        zipCode:
+          data.etablissement.adresseEtablissement.codePostalEtablissement || "",
+        city:
+          data.etablissement.adresseEtablissement.libelleCommuneEtablissement ||
+          "",
+        coordonnee1:
+          data.etablissement.adresseEtablissement
+            .coordonneeLambertAbscisseEtablissement || "",
+        coordonnee2:
+          data.etablissement.adresseEtablissement
+            .coordonneeLambertOrdonneeEtablissement || "",
+      },
+    };
+
+    res.json({ result: true, restaurant });
+  } catch (error) {
+    res.json({ result: false, error: error.message });
+  }
+});
+
 // POST Créer un restaurant
 router.post(
   "/new",
   [
-    body("siret").notEmpty().withMessage("Le SIRET est requis").trim(),
+    body("siret")
+      .notEmpty()
+      .withMessage("Le SIRET est requis")
+      .trim()
+      .customSanitizer((value) => value.replace(/\s/g, "")) // supprime les espaces
+      .matches(/^\d{14}$/), // N° SIRET français sans espace
     body("name").notEmpty().withMessage("Le nom est requis").trim(),
     body("address").notEmpty().withMessage("L'adresse est requise").trim(),
     body("city").notEmpty().withMessage("La ville est requise").trim(),
-    body("country").notEmpty().withMessage("Le pays est requis").trim(),
+    body("zipCode")
+      .notEmpty()
+      .withMessage("Le code postal est requis")
+      .trim()
+      .matches(/^\d{5}$/),
     body("email")
       .notEmpty()
       .withMessage("L'email est requis")
@@ -57,7 +117,10 @@ router.post(
       .notEmpty()
       .withMessage(
         "Nous avons besoin de votre numéro de téléphone pour confirmer votre réservation.",
-      ),
+      )
+      .customSanitizer((value) => value.replace(/\s/g, "")) // supprime les espaces
+      .matches(/^\+33[67]\d{8}$/) // N° téléphone mobile français sans espace
+      .withMessage("Format du n° de téléphone invalide — ex: +33612345678"),
     body("openingDays")
       .notEmpty()
       .withMessage("Merci d'indiquer les jours d'ouverture"),
@@ -73,8 +136,9 @@ router.post(
         name,
         address,
         city,
-        country,
+        zipCode,
         email,
+        password,
         phoneNumber,
         openingDays,
         services,
@@ -89,12 +153,24 @@ router.post(
         });
       }
 
+      const checkEmail = await restaurants.findOne({
+        email: email.toLowerCase(),
+      });
+
+      if (checkEmail) {
+        return res.status(400).json({
+          result: false,
+          message: "Votre email existe déjà dans notre base de données !",
+        });
+      }
+
       const newRestaurant = new restaurants({
         siret,
         name,
         address,
         city,
-        country,
+        zipCode,
+        password,
         email: email.toLowerCase(),
         phoneNumber,
         openingDays,
@@ -146,6 +222,7 @@ router.post(
           result: true,
           message: `Bienvenue ${restaurant.name} !`,
           restaurantId: restaurant._id,
+          restaurantName: restaurant.name,
         });
       }
     } catch (err) {
