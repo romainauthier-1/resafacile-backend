@@ -164,13 +164,15 @@ router.post(
         });
       }
 
+      const hash = await bcrypt.hash(password, 10);
+
       const newRestaurant = new restaurants({
         siret,
         name,
         address,
         city,
         zipCode,
-        password,
+        password: hash,
         email: email.toLowerCase(),
         phoneNumber,
         openingDays,
