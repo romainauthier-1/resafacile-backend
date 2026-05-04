@@ -135,12 +135,10 @@ router.post(
       });
 
       if (!restaurant) {
-        return res
-          .status(404)
-          .json({
-            result: false,
-            message: "Aucun restaurant trouvé avec cet email.",
-          });
+        return res.status(404).json({
+          result: false,
+          message: "Aucun restaurant trouvé avec cet email.",
+        });
       }
 
       if (restaurant && (await bcrypt.compare(password, restaurant.password))) {
@@ -180,6 +178,46 @@ router.delete("/delete/:restaurandId", async (req, res) => {
   } catch (err) {
     res.status(500).json({ result: false, message: err.message });
   }
+});
+
+// PATCH Fermer un service
+router.patch("/service/close-date/:restaurantId", async (req, res) => {
+  const { serviceId, date } = req.body;
+
+  const restaurant = await restaurants.findByIdAndUpdate(
+    req.params.restaurantId,
+    {
+      $addToSet: {
+        "services.$[s].closedDates": new Date(date),
+      },
+    },
+    {
+      arrayFilters: [{ "s._id": serviceId }],
+      returnDocument: "after",
+    },
+  );
+
+  res.json({ result: true, restaurant });
+});
+
+// PATCH Ouvrir un service pour une date précise
+router.patch("/service/open-date/:restaurantId", async (req, res) => {
+  const { serviceId, date } = req.body;
+
+  const restaurant = await restaurants.findByIdAndUpdate(
+    req.params.restaurantId,
+    {
+      $pull: {
+        "services.$[s].closedDates": new Date(date),
+      },
+    },
+    {
+      arrayFilters: [{ "s._id": serviceId }],
+      returnDocument: "after",
+    },
+  );
+
+  res.json({ result: true, restaurant });
 });
 
 module.exports = router;

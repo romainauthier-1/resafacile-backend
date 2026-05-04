@@ -116,75 +116,103 @@ router.post(
           .json({ result: false, message: "Restaurant non trouvé." });
       }
 
-      // restaurant.services.map((service) => {
-      //   const isDayOK = service.dayOfWeek.includes(
-      //     new Date(dateTime).toLocaleDateString("fr-FR", { weekday: "long" }),
-      //   );
-      //   const isHourOK =
-      //     service.startTime.getTime() < dateTime.getTime() &&
-      //     service.endTime.getTime() > dateTime.getTime();
-      //   const isServiceOpen = service.isOpen;
-      //   if (!isDayOK || !isHourOK || !isServiceOpen) {
-      //     return res
-      //       .status(400)
-      //       .json({
-      //         result: false,
-      //         message:
-      //           "Il n'y a pas de disponibilité pour la date et l'heure choisies.",
-      //       });
-      //   }
-      // });
-
-      const newBooking = new bookings({
-        customer: {
-          firstName: firstName.toLowerCase(),
-          lastName: lastName.toLowerCase(),
-          email: email.toLowerCase(),
-          phoneNumber,
-        },
-        dateTime: new Date(dateTime),
-        occasion,
-        nbPax,
-        restaurant: restaurantId,
+      const bookingDate = new Date(dateTime);
+      const bookingDay = new Date(dateTime).toLocaleDateString("fr-FR", {
+        weekday: "long",
       });
+      const bookingMinutes =
+        bookingDate.getHours() * 60 + bookingDate.getMinutes();
 
-      const savedBooking = await newBooking.save();
-      await savedBooking.populate("restaurant", "name phoneNumber");
-
-      const smsBody = `Bonjour ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)}, votre réservation pour ${savedBooking.nbPax} ${savedBooking.nbPax > 1 ? "personnes" : "personne"} le ${savedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} est enregistrée. Merci et à bientôt, ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}`;
-      const restaurantSmsBody = `Bonjour ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}, nouvelle réservation: ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)} | ${savedBooking.nbPax} pax | ${savedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${savedBooking.occasion && `| Occasion: ${savedBooking.occasion}`}`;
-      const smsToCustomer = await sendSMS(
-        savedBooking?.customer.phoneNumber,
-        smsBody,
-      );
-      const smsToRestaurant = await sendSMS(
-        savedBooking?.restaurant.phoneNumber,
-        restaurantSmsBody,
-      );
-
-      if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
-        console.error(
-          "Erreur lors de l'envoi du SMS de confirmation",
-          smsToRestaurant.errorMessage,
-          smsToCustomer.errorMessage,
-        );
-        return res.status(500).json({
+      if (!restaurant.openingDays.includes(bookingDay)) {
+        return res.status(400).json({
           result: false,
-          message:
-            "Erreur lors de la validation de votre réservation, veuillez réessayer.",
-          smsToCustomer,
-          smsToRestaurant,
+          message: `Le restaurant est fermé le ${bookingDay}`,
         });
       }
 
-      if (
-        smsToCustomer.errorMessage === null &&
-        smsToRestaurant.errorMessage === null
-      ) {
+      const bookingDateCheck = new Date(dateTime);
+      bookingDateCheck.setHours(0, 0, 0, 0);
+
+      const matchingService = restaurant.services.find((service) => {
+        const isDayOK =
+          service.dayOfWeek.length > 0
+            ? service.dayOfWeek.includes(bookingDay)
+            : false;
+
+        const isHourOK =
+          bookingMinutes >= service.startTime &&
+          bookingMinutes <= service.endTime;
+
+        const isDateClosed = service.closedDates.some((closedDate) => {
+          const closedDateCheck = new Date(closedDate);
+          closedDateCheck.setHours(0, 0, 0, 0);
+
+          return bookingDateCheck.getTime() === closedDateCheck.getTime();
+        });
+
+        if (isDayOK && isHourOK && service.isOpen && !isDateClosed) {
+          return true;
+        }
+      });
+
+      if (matchingService) {
+        const newBooking = new bookings({
+          customer: {
+            firstName: firstName.toLowerCase(),
+            lastName: lastName.toLowerCase(),
+            email: email.toLowerCase(),
+            phoneNumber,
+          },
+          dateTime: new Date(dateTime),
+          occasion,
+          nbPax,
+          restaurant: restaurantId,
+        });
+
+        const savedBooking = await newBooking.save();
+        await savedBooking.populate("restaurant", "name phoneNumber");
+
+        const smsBody = `Bonjour ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)}, votre réservation pour ${savedBooking.nbPax} ${savedBooking.nbPax > 1 ? "personnes" : "personne"} le ${savedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} est enregistrée. Merci et à bientôt, ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}`;
+        const restaurantSmsBody = `Bonjour ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}, nouvelle réservation: ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)} | ${savedBooking.nbPax} pax | ${savedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${savedBooking.occasion && `| Occasion: ${savedBooking.occasion}`}`;
+        // const smsToCustomer = await sendSMS(
+        //   savedBooking?.customer.phoneNumber,
+        //   smsBody,
+        // );
+        // const smsToRestaurant = await sendSMS(
+        //   savedBooking?.restaurant.phoneNumber,
+        //   restaurantSmsBody,
+        // );
+
+        // if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
+        //   console.error(
+        //     "Erreur lors de l'envoi du SMS de confirmation",
+        //     smsToRestaurant.errorMessage,
+        //     smsToCustomer.errorMessage,
+        //   );
+        //   return res.status(500).json({
+        //     result: false,
+        //     message:
+        //       "Erreur lors de la validation de votre réservation, veuillez réessayer.",
+        //     smsToCustomer,
+        //     smsToRestaurant,
+        //   });
+        // }
+
+        // if (
+        //   smsToCustomer.errorMessage === null &&
+        //   smsToRestaurant.errorMessage === null
+        // ) {
         res.status(201).json({
           result: true,
           savedBooking,
           message: "Réservation effectuée !",
+        });
+        // }
+      } else {
+        return res.status(400).json({
+          result: false,
+          message:
+            "Il n'y a pas de disponibilité pour la date et l'heure choisies.",
         });
       }
     } catch (err) {

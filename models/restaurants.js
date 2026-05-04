@@ -41,6 +41,7 @@ const restaurantSchema = new mongoose.Schema({
         ],
       },
       isOpen: { type: Boolean, default: true },
+      closedDates: { type: [Date], default: [] },
     },
   ],
 });
