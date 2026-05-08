@@ -38,57 +38,6 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// GET Obtenir toutes les informations du restaurant avec son siret
-router.get("/:siret", async (req, res) => {
-  try {
-    const response = await fetch(
-      `https://api.insee.fr/api-sirene/3.11/siret/${req.params.siret}`,
-      {
-        headers: { "X-INSEE-Api-Key-Integration": process.env.SIRENE_API_KEY },
-      },
-    );
-
-    const data = await response.json();
-
-    if (data.header.statut !== 200) {
-      res.json({
-        result: false,
-        message: response.header.message,
-      });
-    }
-
-    const restaurant = {
-      siret: data.etablissement.siret,
-      businessCommercialName:
-        data.etablissement.uniteLegale.denominationUniteLegale,
-      businessAddress: {
-        number:
-          data.etablissement.adresseEtablissement.numeroVoieEtablissement || "",
-        streetType:
-          data.etablissement.adresseEtablissement.typeVoieEtablissement || "",
-        streetName:
-          data.etablissement.adresseEtablissement.libelleVoieEtablissement ||
-          "",
-        zipCode:
-          data.etablissement.adresseEtablissement.codePostalEtablissement || "",
-        city:
-          data.etablissement.adresseEtablissement.libelleCommuneEtablissement ||
-          "",
-        coordonnee1:
-          data.etablissement.adresseEtablissement
-            .coordonneeLambertAbscisseEtablissement || "",
-        coordonnee2:
-          data.etablissement.adresseEtablissement
-            .coordonneeLambertOrdonneeEtablissement || "",
-      },
-    };
-
-    res.json({ result: true, restaurant });
-  } catch (error) {
-    res.json({ result: false, error: error.message });
-  }
-});
-
 // POST Créer un restaurant
 router.post(
   "/new",
@@ -116,7 +65,7 @@ router.post(
     body("phoneNumber")
       .notEmpty()
       .withMessage(
-        "Nous avons besoin de votre numéro de téléphone pour confirmer votre réservation.",
+        "Nous avons besoin de votre numéro de téléphone pour transmettre les réservations.",
       )
       .customSanitizer((value) => value.replace(/\s/g, "")) // supprime les espaces
       .matches(/^\+33[67]\d{8}$/) // N° téléphone mobile français sans espace
@@ -164,6 +113,31 @@ router.post(
         });
       }
 
+      // let number = 1;
+      // let slug = name.split(" ").join("-").toLowerCase() + "-" + number;
+
+      const slugify = (str) => {
+        return str
+          .normalize("NFD") // Décompose les accents (é -> e + ´)
+          .replace(/[\u0300-\u036f]/g, "") // Supprime les morceaux d'accents
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9 ]/g, "") // Supprime tout ce qui n'est pas lettre, chiffre ou espace
+          .replace(/\s+/g, "-"); // Remplace les espaces par des tirets
+      };
+
+      const slug = slugify(name);
+
+      const checkSlug = await restaurants.findOne({ slug });
+
+      if (checkSlug) {
+        // slug = name.split(" ").join("-").toLowerCase() + "-" + ++number;
+        return res.status(400).json({
+          result: false,
+          message: "Un restaurant existe déjà avec le même nom.",
+        });
+      }
+
       const hash = await bcrypt.hash(password, 10);
 
       const newRestaurant = new restaurants({
@@ -177,12 +151,15 @@ router.post(
         phoneNumber,
         openingDays,
         services,
+        slug,
       });
 
       const savedRestaurant = await newRestaurant.save();
       res.status(201).json({
         result: true,
-        savedRestaurant,
+        restaurantId: savedRestaurant._id,
+        restaurantName: savedRestaurant.name,
+        restaurantSlug: savedRestaurant.slug,
         message: "Restaurant créé !",
       });
     } catch (err) {
@@ -225,6 +202,7 @@ router.post(
           message: `Bienvenue ${restaurant.name} !`,
           restaurantId: restaurant._id,
           restaurantName: restaurant.name,
+          restaurantSlug: restaurant.slug,
         });
       }
     } catch (err) {
@@ -297,6 +275,81 @@ router.patch("/service/open-date/:restaurantId", async (req, res) => {
   );
 
   res.json({ result: true, restaurant });
+});
+
+// GET Obtenir toutes les informations du restaurant avec son siret
+router.get("/:siret", async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://api.insee.fr/api-sirene/3.11/siret/${req.params.siret}`,
+      {
+        headers: { "X-INSEE-Api-Key-Integration": process.env.SIRENE_API_KEY },
+      },
+    );
+
+    const data = await response.json();
+
+    if (data.header.statut !== 200) {
+      res.json({
+        result: false,
+        message: response.header.message,
+      });
+    }
+
+    const restaurant = {
+      siret: data.etablissement.siret,
+      businessCommercialName:
+        data.etablissement.uniteLegale.denominationUniteLegale,
+      businessAddress: {
+        number:
+          data.etablissement.adresseEtablissement.numeroVoieEtablissement || "",
+        streetType:
+          data.etablissement.adresseEtablissement.typeVoieEtablissement || "",
+        streetName:
+          data.etablissement.adresseEtablissement.libelleVoieEtablissement ||
+          "",
+        zipCode:
+          data.etablissement.adresseEtablissement.codePostalEtablissement || "",
+        city:
+          data.etablissement.adresseEtablissement.libelleCommuneEtablissement ||
+          "",
+        coordonnee1:
+          data.etablissement.adresseEtablissement
+            .coordonneeLambertAbscisseEtablissement || "",
+        coordonnee2:
+          data.etablissement.adresseEtablissement
+            .coordonneeLambertOrdonneeEtablissement || "",
+      },
+    };
+
+    res.json({ result: true, restaurant });
+  } catch (error) {
+    res.json({ result: false, error: error.message });
+  }
+});
+
+// GET Restaurant par slug
+router.get("/reserver/:slug", async (req, res) => {
+  try {
+    const foundRestaurant = await restaurants.findOne({
+      slug: req.params.slug,
+    });
+
+    if (foundRestaurant) {
+      res.status(200).json({
+        result: true,
+        foundRestaurant,
+        message: "Restaurant récupéré.",
+      });
+    } else {
+      res
+        .status(404)
+        .json({ result: false, message: "Restaurant non trouvé." });
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ result: false, message: err.message });
+  }
 });
 
 module.exports = router;
