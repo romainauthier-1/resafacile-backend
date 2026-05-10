@@ -57,7 +57,11 @@ router.post(
       .notEmpty()
       .withMessage(
         "Nous avons besoin de votre numéro de téléphone pour confirmer votre réservation.",
-      ),
+      )
+      .trim()
+      .replace(/\s+/g, "")
+      .matches(/^\+33[67]\d{8}$/)
+      .withMessage("Le numéro de téléphone doit être au format +33612345678"),
     body("dateTime")
       .notEmpty()
       .withMessage("Merci d'indiquer la date et l'heure de votre venue.")

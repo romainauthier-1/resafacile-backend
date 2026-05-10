@@ -140,6 +140,11 @@ router.post(
 
       const hash = await bcrypt.hash(password, 10);
 
+      const servicesWithOpeningDays = services.map((service) => ({
+        ...service,
+        dayOfWeek: openingDays,
+      }));
+
       const newRestaurant = new restaurants({
         siret,
         name,
@@ -150,7 +155,7 @@ router.post(
         email: email.toLowerCase(),
         phoneNumber,
         openingDays,
-        services,
+        services: servicesWithOpeningDays,
         slug,
       });
 
