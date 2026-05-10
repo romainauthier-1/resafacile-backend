@@ -186,40 +186,40 @@ router.post(
 
         const smsBody = `Bonjour ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)}, votre réservation pour ${savedBooking.nbPax} ${savedBooking.nbPax > 1 ? "personnes" : "personne"} le ${savedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} est enregistrée. Merci et à bientôt, ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}`;
         const restaurantSmsBody = `Bonjour ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}, nouvelle réservation: ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)} | ${savedBooking.nbPax} pax | ${savedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${savedBooking.occasion && `| Occasion: ${savedBooking.occasion}`}`;
-        // const smsToCustomer = await sendSMS(
-        //   savedBooking?.customer.phoneNumber,
-        //   smsBody,
-        // );
-        // const smsToRestaurant = await sendSMS(
-        //   savedBooking?.restaurant.phoneNumber,
-        //   restaurantSmsBody,
-        // );
+        const smsToCustomer = await sendSMS(
+          savedBooking?.customer.phoneNumber,
+          smsBody,
+        );
+        const smsToRestaurant = await sendSMS(
+          savedBooking?.restaurant.phoneNumber,
+          restaurantSmsBody,
+        );
 
-        // if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
-        //   console.error(
-        //     "Erreur lors de l'envoi du SMS de confirmation",
-        //     smsToRestaurant.errorMessage,
-        //     smsToCustomer.errorMessage,
-        //   );
-        //   return res.status(500).json({
-        //     result: false,
-        //     message:
-        //       "Erreur lors de la validation de votre réservation, veuillez réessayer.",
-        //     smsToCustomer,
-        //     smsToRestaurant,
-        //   });
-        // }
+        if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
+          console.error(
+            "Erreur lors de l'envoi du SMS de confirmation",
+            smsToRestaurant.errorMessage,
+            smsToCustomer.errorMessage,
+          );
+          return res.status(500).json({
+            result: false,
+            message:
+              "Erreur lors de la validation de votre réservation, veuillez réessayer.",
+            smsToCustomer,
+            smsToRestaurant,
+          });
+        }
 
-        // if (
-        //   smsToCustomer.errorMessage === null &&
-        //   smsToRestaurant.errorMessage === null
-        // ) {
-        res.status(201).json({
-          result: true,
-          savedBooking,
-          message: "Réservation effectuée !",
-        });
-        // }
+        if (
+          smsToCustomer.errorMessage === null &&
+          smsToRestaurant.errorMessage === null
+        ) {
+          res.status(201).json({
+            result: true,
+            savedBooking,
+            message: "Réservation effectuée !",
+          });
+        }
       } else {
         return res.status(400).json({
           result: false,
