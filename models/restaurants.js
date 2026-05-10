@@ -24,12 +24,12 @@ const restaurantSchema = new mongoose.Schema({
     ],
     required: true,
   },
+  gap: { type: Number, required: true },
   services: [
     {
       name: { type: String, required: true },
       startTime: { type: Number, required: true },
       endTime: { type: Number, required: true },
-      gap: { type: Number, required: true },
       dayOfWeek: {
         type: [String],
         enum: [
@@ -48,6 +48,6 @@ const restaurantSchema = new mongoose.Schema({
   ],
 });
 
-const restaurants = mongoose.model("Restaurant", restaurantSchema);
+const restaurants = mongoose.model("restaurants", restaurantSchema);
 
 module.exports = restaurants;

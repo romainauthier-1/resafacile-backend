@@ -100,6 +100,7 @@ router.post(
         phoneNumber,
         openingDays,
         services,
+        gap,
       } = req.body;
 
       const restaurant = await restaurants.findOne({ siret });
@@ -122,9 +123,6 @@ router.post(
         });
       }
 
-      // let number = 1;
-      // let slug = name.split(" ").join("-").toLowerCase() + "-" + number;
-
       const slugify = (str) => {
         return str
           .normalize("NFD") // Décompose les accents (é -> e + ´)
@@ -140,7 +138,6 @@ router.post(
       const checkSlug = await restaurants.findOne({ slug });
 
       if (checkSlug) {
-        // slug = name.split(" ").join("-").toLowerCase() + "-" + ++number;
         return res.status(400).json({
           result: false,
           message: "Un restaurant existe déjà avec le même nom.",
@@ -166,6 +163,7 @@ router.post(
         openingDays,
         services: servicesWithOpeningDays,
         slug,
+        gap,
       });
 
       const savedRestaurant = await newRestaurant.save();
@@ -174,6 +172,7 @@ router.post(
         restaurantId: savedRestaurant._id,
         restaurantName: savedRestaurant.name,
         restaurantSlug: savedRestaurant.slug,
+        restaurantGap: savedRestaurant.gap,
         message: "Restaurant créé !",
       });
     } catch (err) {
@@ -217,6 +216,7 @@ router.post(
           restaurantId: restaurant._id,
           restaurantName: restaurant.name,
           restaurantSlug: restaurant.slug,
+          restauranGap: restaurant.gap,
         });
       }
     } catch (err) {
