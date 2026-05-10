@@ -60,8 +60,16 @@ router.post(
       )
       .trim()
       .replace(/\s+/g, "")
+      .customSanitizer((value) => {
+        if (value.startsWith("0")) {
+          return "+33" + value.slice(1);
+        }
+        return value;
+      })
       .matches(/^\+33[67]\d{8}$/)
-      .withMessage("Le numéro de téléphone doit être au format +33612345678"),
+      .withMessage(
+        "Le numéro de téléphone doit être au format 0612345678 ou +33712345678",
+      ),
     body("dateTime")
       .notEmpty()
       .withMessage("Merci d'indiquer la date et l'heure de votre venue.")
@@ -250,41 +258,90 @@ router.delete("/cancel/:bookingId", async (req, res) => {
   }
 });
 
-// POST Modifier une réservation
-router.put("/update/:bookingId", async (req, res) => {
-  const { firstName, lastName, email, date, time, nbPax, occasion } = req.body;
-  const { bookingId } = req.params;
-  try {
-    const updatedBooking = await bookings.findByIdAndUpdate(
-      bookingId,
-      {
-        firstName: firstName.toLowerCase(),
-        lastName: lastName.toLowerCase(),
-        email: email.toLowerCase(),
-        date,
-        time,
-        nbPax,
-        occasion,
-      },
-      { returnDocument: "after" },
-    );
+// PUT Modifier une réservation
+router.put(
+  "/update/:bookingId",
+  [
+    body("firstName").notEmpty().withMessage("Le prénom est requis").trim(),
+    body("lastName").notEmpty().withMessage("Le nom est requis").trim(),
+    body("email")
+      .notEmpty()
+      .withMessage("L'email est requis")
+      .trim()
+      .isEmail()
+      .withMessage("Utilisez un format d'email valide : jean@mail.com"),
+    body("phoneNumber")
+      .notEmpty()
+      .withMessage(
+        "Nous avons besoin de votre numéro de téléphone pour confirmer votre réservation.",
+      )
+      .trim()
+      .replace(/\s+/g, "")
+      .customSanitizer((value) => {
+        if (value.startsWith("0")) {
+          return "+33" + value.slice(1);
+        }
+        return value;
+      })
+      .matches(/^\+33[67]\d{8}$/)
+      .withMessage(
+        "Le numéro de téléphone doit être au format 0612345678 ou +33712345678",
+      ),
+    body("dateTime")
+      .notEmpty()
+      .withMessage("Merci d'indiquer la date et l'heure de votre venue.")
+      .trim(),
+    body("nbPax")
+      .notEmpty()
+      .withMessage("Merci d'indiquer le nombre de convives")
+      .trim(),
+  ],
+  validate,
+  async (req, res) => {
+    const {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      dateTime,
+      nbPax,
+      occasion,
+    } = req.body;
+    const { bookingId } = req.params;
+    try {
+      const updatedBooking = await bookings.findByIdAndUpdate(
+        bookingId,
+        {
+          customer: {
+            firstName: firstName.toLowerCase(),
+            lastName: lastName.toLowerCase(),
+            email: email.toLowerCase(),
+            phoneNumber,
+          },
+          dateTime,
+          nbPax,
+          occasion,
+        },
+        { returnDocument: "after" },
+      );
 
-    if (updatedBooking) {
-      res.status(200).json({
-        result: true,
-        updatedBooking,
-        message: "Réservation mise à jour !",
-      });
-    } else {
-      res.status(404).json({
-        result: false,
-        message:
-          "Réservation non modifiée, veuillez nous contacter directement.",
-      });
+      if (updatedBooking) {
+        res.status(200).json({
+          result: true,
+          updatedBooking,
+          message: "Réservation mise à jour !",
+        });
+      } else {
+        res.status(404).json({
+          result: false,
+          message:
+            "Réservation non modifiée, veuillez nous contacter directement.",
+        });
+      }
+    } catch (err) {
+      res.status(500).json({ result: false, message: err.message });
     }
-  } catch (err) {
-    res.status(500).json({ result: false, message: err.message });
-  }
-});
+  },
+);
 
 module.exports = router;

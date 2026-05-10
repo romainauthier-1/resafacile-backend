@@ -67,9 +67,18 @@ router.post(
       .withMessage(
         "Nous avons besoin de votre numéro de téléphone pour transmettre les réservations.",
       )
-      .customSanitizer((value) => value.replace(/\s/g, "")) // supprime les espaces
-      .matches(/^\+33[67]\d{8}$/) // N° téléphone mobile français sans espace
-      .withMessage("Format du n° de téléphone invalide — ex: +33612345678"),
+      .trim()
+      .replace(/\s+/g, "")
+      .customSanitizer((value) => {
+        if (value.startsWith("0")) {
+          return "+33" + value.slice(1);
+        }
+        return value;
+      })
+      .matches(/^\+33[67]\d{8}$/)
+      .withMessage(
+        "Le numéro de téléphone doit être au format 0612345678 ou +33712345678",
+      ),
     body("openingDays")
       .notEmpty()
       .withMessage("Merci d'indiquer les jours d'ouverture"),
