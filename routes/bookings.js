@@ -90,6 +90,7 @@ router.post(
         dateTime,
         nbPax,
         occasion,
+        sendMessage,
       } = req.body;
       const { restaurantId } = req.params;
 
@@ -184,36 +185,44 @@ router.post(
         const savedBooking = await newBooking.save();
         await savedBooking.populate("restaurant", "name phoneNumber");
 
-        const smsBody = `Bonjour ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)}, votre réservation pour ${savedBooking.nbPax} ${savedBooking.nbPax > 1 ? "personnes" : "personne"} le ${savedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} est enregistrée. Merci et à bientôt, ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}`;
-        const restaurantSmsBody = `Bonjour ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}, nouvelle réservation: ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)} | ${savedBooking.nbPax} pax | ${savedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${savedBooking.occasion && `| Occasion: ${savedBooking.occasion}`}`;
-        const smsToCustomer = await sendSMS(
-          savedBooking?.customer.phoneNumber,
-          smsBody,
-        );
-        const smsToRestaurant = await sendSMS(
-          savedBooking?.restaurant.phoneNumber,
-          restaurantSmsBody,
-        );
-
-        if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
-          console.error(
-            "Erreur lors de l'envoi du SMS de confirmation",
-            smsToRestaurant.errorMessage,
-            smsToCustomer.errorMessage,
+        if (sendMessage) {
+          const smsBody = `Bonjour ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)}, votre réservation pour ${savedBooking.nbPax} ${savedBooking.nbPax > 1 ? "personnes" : "personne"} le ${savedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} est enregistrée. Merci et à bientôt, ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}`;
+          const restaurantSmsBody = `Bonjour ${savedBooking.restaurant.name && capitalize(savedBooking.restaurant.name)}, nouvelle réservation: ${capitalize(savedBooking.customer.firstName)} ${capitalize(savedBooking.customer.lastName)} | ${savedBooking.nbPax} pax | ${savedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${savedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${savedBooking.occasion && `| Occasion: ${savedBooking.occasion}`}`;
+          const smsToCustomer = await sendSMS(
+            savedBooking?.customer.phoneNumber,
+            smsBody,
           );
-          return res.status(500).json({
-            result: false,
-            message:
-              "Erreur lors de la validation de votre réservation, veuillez réessayer.",
-            smsToCustomer,
-            smsToRestaurant,
-          });
-        }
+          const smsToRestaurant = await sendSMS(
+            savedBooking?.restaurant.phoneNumber,
+            restaurantSmsBody,
+          );
 
-        if (
-          smsToCustomer.errorMessage === null &&
-          smsToRestaurant.errorMessage === null
-        ) {
+          if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
+            console.error(
+              "Erreur lors de l'envoi du SMS de confirmation",
+              smsToRestaurant.errorMessage,
+              smsToCustomer.errorMessage,
+            );
+            return res.status(500).json({
+              result: false,
+              message:
+                "Erreur lors de la validation de votre réservation, veuillez réessayer.",
+              smsToCustomer,
+              smsToRestaurant,
+            });
+          }
+
+          if (
+            smsToCustomer.errorMessage === null &&
+            smsToRestaurant.errorMessage === null
+          ) {
+            res.status(201).json({
+              result: true,
+              savedBooking,
+              message: "Réservation effectuée et SMS envoyé !",
+            });
+          }
+        } else {
           res.status(201).json({
             result: true,
             savedBooking,
@@ -306,31 +315,73 @@ router.put(
       dateTime,
       nbPax,
       occasion,
+      sendMessage,
     } = req.body;
     const { bookingId } = req.params;
     try {
-      const updatedBooking = await bookings.findByIdAndUpdate(
-        bookingId,
-        {
-          customer: {
-            firstName: firstName.toLowerCase(),
-            lastName: lastName.toLowerCase(),
-            email: email.toLowerCase(),
-            phoneNumber,
+      const updatedBooking = await bookings
+        .findByIdAndUpdate(
+          bookingId,
+          {
+            customer: {
+              firstName: firstName.toLowerCase(),
+              lastName: lastName.toLowerCase(),
+              email: email.toLowerCase(),
+              phoneNumber,
+            },
+            dateTime,
+            nbPax,
+            occasion,
           },
-          dateTime,
-          nbPax,
-          occasion,
-        },
-        { returnDocument: "after" },
-      );
+          { returnDocument: "after" },
+        )
+        .populate("restaurant", "name phoneNumber");
 
       if (updatedBooking) {
-        res.status(200).json({
-          result: true,
-          updatedBooking,
-          message: "Réservation mise à jour !",
-        });
+        if (sendMessage) {
+          const smsBody = `Bonjour ${capitalize(updatedBooking.customer.firstName)} ${capitalize(updatedBooking.customer.lastName)}, votre réservation pour ${updatedBooking.nbPax} ${updatedBooking.nbPax > 1 ? "personnes" : "personne"} le ${updatedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${updatedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} a bien été modifiée. Merci et à bientôt, ${updatedBooking.restaurant.name && capitalize(updatedBooking.restaurant.name)}`;
+          const restaurantSmsBody = `Bonjour ${updatedBooking.restaurant.name && capitalize(updatedBooking.restaurant.name)}, réservation modifiée: ${capitalize(updatedBooking.customer.firstName)} ${capitalize(updatedBooking.customer.lastName)} | ${updatedBooking.nbPax} pax | ${updatedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${updatedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${updatedBooking.occasion && `| Occasion: ${updatedBooking.occasion}`}`;
+          const smsToCustomer = await sendSMS(
+            updatedBooking?.customer.phoneNumber,
+            smsBody,
+          );
+          const smsToRestaurant = await sendSMS(
+            updatedBooking?.restaurant.phoneNumber,
+            restaurantSmsBody,
+          );
+
+          if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
+            console.error(
+              "Erreur lors de l'envoi du SMS de confirmation",
+              smsToRestaurant.errorMessage,
+              smsToCustomer.errorMessage,
+            );
+            return res.status(500).json({
+              result: false,
+              message:
+                "Erreur lors de la validation de votre réservation, veuillez réessayer.",
+              smsToCustomer,
+              smsToRestaurant,
+            });
+          }
+
+          if (
+            smsToCustomer.errorMessage === null &&
+            smsToRestaurant.errorMessage === null
+          ) {
+            res.status(201).json({
+              result: true,
+              updatedBooking,
+              message: "Réservation mise à jour et SMS envoyé !",
+            });
+          }
+        } else {
+          res.status(201).json({
+            result: true,
+            updatedBooking,
+            message: "Réservation mise à jour !",
+          });
+        }
       } else {
         res.status(404).json({
           result: false,
