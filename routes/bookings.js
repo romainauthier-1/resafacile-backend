@@ -230,10 +230,23 @@ router.post(
           });
         }
       } else {
+        const formatTime = (minutes) =>
+          `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(
+            minutes % 60,
+          ).padStart(2, "0")}`;
+
+        const availableServices = restaurant.services
+          .map(
+            (service) =>
+              `${capitalize(service.name)} ${formatTime(
+                service.startTime,
+              )} – ${formatTime(service.endTime)}`,
+          )
+          .join(" | ");
+
         return res.status(400).json({
           result: false,
-          message:
-            "Il n'y a pas de disponibilité pour la date et l'heure choisies.",
+          message: `Créneau invalide. Horaires possibles : ${availableServices}`,
         });
       }
     } catch (err) {
@@ -338,48 +351,115 @@ router.put(
         .populate("restaurant", "name phoneNumber");
 
       if (updatedBooking) {
-        if (sendMessage) {
-          const smsBody = `Bonjour ${capitalize(updatedBooking.customer.firstName)} ${capitalize(updatedBooking.customer.lastName)}, votre réservation pour ${updatedBooking.nbPax} ${updatedBooking.nbPax > 1 ? "personnes" : "personne"} le ${updatedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${updatedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} a bien été modifiée. Merci et à bientôt, ${updatedBooking.restaurant.name && capitalize(updatedBooking.restaurant.name)}`;
-          const restaurantSmsBody = `Bonjour ${updatedBooking.restaurant.name && capitalize(updatedBooking.restaurant.name)}, réservation modifiée: ${capitalize(updatedBooking.customer.firstName)} ${capitalize(updatedBooking.customer.lastName)} | ${updatedBooking.nbPax} pax | ${updatedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${updatedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${updatedBooking.occasion && `| Occasion: ${updatedBooking.occasion}`}`;
-          const smsToCustomer = await sendSMS(
-            updatedBooking?.customer.phoneNumber,
-            smsBody,
-          );
-          const smsToRestaurant = await sendSMS(
-            updatedBooking?.restaurant.phoneNumber,
-            restaurantSmsBody,
-          );
+        const restaurant = await restaurants.findById(
+          updatedBooking.restaurant._id,
+        );
 
-          if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
-            console.error(
-              "Erreur lors de l'envoi du SMS de confirmation",
-              smsToRestaurant.errorMessage,
-              smsToCustomer.errorMessage,
-            );
-            return res.status(500).json({
-              result: false,
-              message:
-                "Erreur lors de la validation de votre réservation, veuillez réessayer.",
-              smsToCustomer,
-              smsToRestaurant,
-            });
+        const bookingDate = new Date(updatedBooking.dateTime);
+        const bookingDay = new Date(updatedBooking.dateTime).toLocaleDateString(
+          "fr-FR",
+          {
+            weekday: "long",
+          },
+        );
+        const bookingMinutes =
+          bookingDate.getHours() * 60 + bookingDate.getMinutes();
+
+        if (!restaurant.openingDays.includes(bookingDay)) {
+          return res.status(400).json({
+            result: false,
+            message: `Le restaurant est fermé le ${bookingDay}`,
+          });
+        }
+
+        const bookingDateCheck = new Date(updatedBooking.dateTime);
+        bookingDateCheck.setHours(0, 0, 0, 0);
+
+        const matchingService = restaurant.services.find((service) => {
+          const isDayOK =
+            service.dayOfWeek.length > 0
+              ? service.dayOfWeek.includes(bookingDay)
+              : false;
+
+          const isHourOK =
+            bookingMinutes >= service.startTime &&
+            bookingMinutes <= service.endTime;
+
+          const isDateClosed = service.closedDates.some((closedDate) => {
+            const closedDateCheck = new Date(closedDate);
+            closedDateCheck.setHours(0, 0, 0, 0);
+
+            return bookingDateCheck.getTime() === closedDateCheck.getTime();
+          });
+
+          if (isDayOK && isHourOK && service.isOpen && !isDateClosed) {
+            return true;
           }
+        });
 
-          if (
-            smsToCustomer.errorMessage === null &&
-            smsToRestaurant.errorMessage === null
-          ) {
+        if (matchingService) {
+          if (sendMessage) {
+            const smsBody = `Bonjour ${capitalize(updatedBooking.customer.firstName)} ${capitalize(updatedBooking.customer.lastName)}, votre réservation pour ${updatedBooking.nbPax} ${updatedBooking.nbPax > 1 ? "personnes" : "personne"} le ${updatedBooking.dateTime.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} à ${updatedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} a bien été modifiée. Merci et à bientôt, ${updatedBooking.restaurant.name && capitalize(updatedBooking.restaurant.name)}`;
+            const restaurantSmsBody = `Bonjour ${updatedBooking.restaurant.name && capitalize(updatedBooking.restaurant.name)}, réservation modifiée: ${capitalize(updatedBooking.customer.firstName)} ${capitalize(updatedBooking.customer.lastName)} | ${updatedBooking.nbPax} pax | ${updatedBooking.dateTime.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${updatedBooking.dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} ${updatedBooking.occasion && `| Occasion: ${updatedBooking.occasion}`}`;
+            const smsToCustomer = await sendSMS(
+              updatedBooking?.customer.phoneNumber,
+              smsBody,
+            );
+            const smsToRestaurant = await sendSMS(
+              updatedBooking?.restaurant.phoneNumber,
+              restaurantSmsBody,
+            );
+
+            if (smsToRestaurant.errorMessage || smsToCustomer.errorMessage) {
+              console.error(
+                "Erreur lors de l'envoi du SMS de confirmation",
+                smsToRestaurant.errorMessage,
+                smsToCustomer.errorMessage,
+              );
+              return res.status(500).json({
+                result: false,
+                message:
+                  "Erreur lors de la validation de votre réservation, veuillez réessayer.",
+                smsToCustomer,
+                smsToRestaurant,
+              });
+            }
+
+            if (
+              smsToCustomer.errorMessage === null &&
+              smsToRestaurant.errorMessage === null
+            ) {
+              res.status(201).json({
+                result: true,
+                updatedBooking,
+                message: "Réservation mise à jour et SMS envoyé !",
+              });
+            }
+          } else {
             res.status(201).json({
               result: true,
               updatedBooking,
-              message: "Réservation mise à jour et SMS envoyé !",
+              message: "Réservation mise à jour !",
             });
           }
         } else {
-          res.status(201).json({
-            result: true,
-            updatedBooking,
-            message: "Réservation mise à jour !",
+          const formatTime = (minutes) =>
+            `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(
+              minutes % 60,
+            ).padStart(2, "0")}`;
+
+          const availableServices = restaurant.services
+            .map(
+              (service) =>
+                `${capitalize(service.name)} ${formatTime(
+                  service.startTime,
+                )} – ${formatTime(service.endTime)}`,
+            )
+            .join(" | ");
+
+          return res.status(400).json({
+            result: false,
+            message: `Créneau invalide. Horaires possibles : ${availableServices}`,
           });
         }
       } else {
