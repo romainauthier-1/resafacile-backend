@@ -39,7 +39,7 @@ app.use(
       "http://192.168.1.25:3001",
       "http://192.168.1.25:8081",
     ].filter(Boolean),
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );

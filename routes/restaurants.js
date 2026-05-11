@@ -167,12 +167,12 @@ router.post(
       });
 
       const savedRestaurant = await newRestaurant.save();
+
+      const { password: _, ...savedRestaurantWhitoutPassword } =
+        savedRestaurant.toObject();
       res.status(201).json({
         result: true,
-        restaurantId: savedRestaurant._id,
-        restaurantName: savedRestaurant.name,
-        restaurantSlug: savedRestaurant.slug,
-        restaurantGap: savedRestaurant.gap,
+        restaurant: savedRestaurantWhitoutPassword,
         message: "Restaurant créé !",
       });
     } catch (err) {
@@ -210,13 +210,12 @@ router.post(
       }
 
       if (restaurant && (await bcrypt.compare(password, restaurant.password))) {
+        const { password: _, ...restaurantWhitoutPassword } =
+          restaurant.toObject();
         res.status(200).json({
           result: true,
           message: `Bienvenue ${restaurant.name} !`,
-          restaurantId: restaurant._id,
-          restaurantName: restaurant.name,
-          restaurantSlug: restaurant.slug,
-          restauranGap: restaurant.gap,
+          restaurant: restaurantWhitoutPassword,
         });
       }
     } catch (err) {
@@ -268,7 +267,11 @@ router.patch("/service/close-date/:restaurantId", async (req, res) => {
     },
   );
 
-  res.json({ result: true, restaurant });
+  res.json({
+    result: true,
+    services: restaurant.services,
+    message: "Service fermé",
+  });
 });
 
 // PATCH Ouvrir un service pour une date précise
@@ -288,7 +291,11 @@ router.patch("/service/open-date/:restaurantId", async (req, res) => {
     },
   );
 
-  res.json({ result: true, restaurant });
+  res.json({
+    result: true,
+    services: restaurant.services,
+    message: "Service ouvert",
+  });
 });
 
 // GET Obtenir toutes les informations du restaurant avec son siret
