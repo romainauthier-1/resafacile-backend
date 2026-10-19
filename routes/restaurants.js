@@ -19,7 +19,7 @@ const validate = (req, res, next) => {
 // GET la liste des restaurants
 router.get("/all", async (req, res) => {
   try {
-    const allRestaurants = await restaurants.find();
+    const allRestaurants = await restaurants.find().select("-password");
 
     if (allRestaurants.length > 0) {
       res.status(200).json({
@@ -352,9 +352,9 @@ router.get("/:siret", async (req, res) => {
 // GET Restaurant par slug
 router.get("/reserver/:slug", async (req, res) => {
   try {
-    const foundRestaurant = await restaurants.findOne({
-      slug: req.params.slug,
-    });
+    const foundRestaurant = await restaurants
+      .findOne({ slug: req.params.slug })
+      .select("-password");
 
     if (foundRestaurant) {
       res.status(200).json({
