@@ -1,7 +1,8 @@
 {
-  "name": "template-backend-mongo",
+  "name": "resafacile-backend",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "yarn@4.9.2",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
@@ -18,9 +19,7 @@
     "express-validator": "^7.3.2",
     "mongoose": "^9.3.3",
     "morgan": "~1.9.1",
-    "twilio": "^6.0.0",
-    "uid2": "^1.0.0",
-    "web-push": "^3.6.7"
+    "twilio": "^6.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

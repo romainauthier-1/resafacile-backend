@@ -1,383 +1,83 @@
-# 🍽️ ResaFacile — Backend
+# 🍽️ RésaFacile — Backend
 
-> **Une API de réservation pour restaurants** — Un backend Node.js/Express avec MongoDB pour gérer les réservations, les restaurants et l'envoi de notifications SMS.
+API REST de RésaFacile, un outil de réservation en ligne pour restaurants : inscription des établissements, contrôle des créneaux de réservation et confirmations par SMS.
 
-[![Node.js](https://img.shields.io/badge/Node.js-16%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Express.js](https://img.shields.io/badge/Express.js-4.16.1-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-9.3.3-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![Mongoose](https://img.shields.io/badge/Mongoose-9.3.3-880000?style=for-the-badge&logo=mongoose&logoColor=white)](https://mongoosejs.com/)
-[![Twilio](https://img.shields.io/badge/Twilio-6.0.0-F22F46?style=for-the-badge&logo=twilio&logoColor=white)](https://www.twilio.com/)
-[![Web Push](https://img.shields.io/badge/Web_Push-3.6.7-0055A4?style=for-the-badge)](https://developer.mozilla.org/en-US/docs/Web/API/Push_API)
-[![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+**Frontend :** [resafacile-frontend](https://github.com/romainauthier-1/resafacile-frontend) · **Démo :** [resafacile.vercel.app](https://resafacile.vercel.app)
+
+![Node.js](https://img.shields.io/badge/Node.js-Express_4-339933?logo=node.js&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_9-47A248?logo=mongodb&logoColor=white)
+![Twilio](https://img.shields.io/badge/Twilio-SMS-F22F46?logo=twilio&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
 
 ---
 
-## 📜 À propos du projet
+## Fonctionnalités
 
-**ResaFacile Backend** est une **API RESTful** spécialement conçue pour la gestion de réservations dans les restaurants. Elle permet de :
+- **Inscription d'un restaurant** : validation des champs (SIRET à 14 chiffres, code postal, email), mot de passe haché avec bcrypt, slug unique pour la page de réservation publique.
+- **Intégration API SIRENE (INSEE)** : récupération de la raison sociale et de l'adresse d'un établissement à partir de son SIRET.
+- **Contrôle des créneaux** : une réservation est acceptée seulement si le jour est ouvert, si l'heure tombe dans un service actif, si le service n'est pas fermé à cette date et si la date n'est pas passée. Sinon, l'API renvoie les horaires possibles.
+- **Détection des doublons** : même client, même restaurant, même horaire.
+- **SMS via Twilio** (optionnel à chaque réservation) : confirmation au client et notification au restaurant, à la création comme à la modification.
+- **Fermetures ponctuelles** : fermeture ou réouverture d'un service pour une date donnée.
+- **Validation et normalisation des entrées** avec express-validator (numéros de mobile convertis au format international, par exemple).
+- **Rate limiting** sur la création de réservation (10 requêtes par IP toutes les 10 minutes) et **CORS** restreint aux origines connues.
 
-- Gérer les restaurants avec leurs informations, horaires et services
-- Créer et gérer les réservations des clients
-- Envoyer des notifications SMS via Twilio
-- Limiter les tentatives de réservation pour éviter les abus
+> Les routes de l'espace restaurant ne sont pas encore protégées par un jeton d'authentification : la connexion vérifie le mot de passe et renvoie le profil du restaurant, que le client réutilise ensuite. L'ajout d'un jeton (JWT) et d'un middleware sur les routes du tableau de bord est la prochaine évolution prévue.
 
----
+## Stack technique
 
-## 🔧 Stack Technique
+Node.js, Express 4, MongoDB (Atlas) avec Mongoose 9, bcrypt, express-validator, express-rate-limit, Twilio, déploiement serverless sur Vercel.
 
-| Catégorie            | Technologie                                                            | Version | Rôle                                  |
-| -------------------- | ---------------------------------------------------------------------- | ------- | ------------------------------------- |
-| **Runtime**          | [Node.js](https://nodejs.org/)                                         | 16+     | Environnement d'exécution             |
-| **Framework**        | [Express.js](https://expressjs.com/)                                   | 4.16.1  | Framework web                         |
-| **Base de données**  | [MongoDB](https://www.mongodb.com/)                                    | Atlas   | Base de données NoSQL                 |
-| **ODM**              | [Mongoose](https://mongoosejs.com/)                                    | 9.3.3   | Modélisation MongoDB                  |
-| **Authentification** | [bcrypt](https://www.npmjs.com/package/bcrypt)                         | 6.0.0   | Hashage des mots de passe             |
-| **Tokens**           | [uid2](https://www.npmjs.com/package/uid2)                             | 1.0.0   | Génération de tokens                  |
-| **SMS**              | [Twilio](https://www.twilio.com/)                                      | 6.0.0   | Envoi de SMS                          |
-| **Rate Limiting**    | [express-rate-limit](https://www.npmjs.com/package/express-rate-limit) | 8.4.1   | Limitation des requêtes               |
-| **Validation**       | [express-validator](https://express-validator.github.io/docs/)         | 7.3.2   | Validation des requêtes               |
-| **CORS**             | [cors](https://www.npmjs.com/package/cors)                             | 2.8.6   | Middleware CORS                       |
-| **Cookies**          | [cookie-parser](https://www.npmjs.com/package/cookie-parser)           | 1.4.4   | Gestion des cookies                   |
-| **Logging**          | [morgan](https://www.npmjs.com/package/morgan)                         | 1.9.1   | Logger HTTP                           |
-| **Environnement**    | [dotenv](https://www.npmjs.com/package/dotenv)                         | 17.4.0  | Gestion des variables d'environnement |
-| **Déploiement**      | [Vercel](https://vercel.com/)                                          | -       | Hébergement serverless                |
+## Routes
 
----
+| Méthode | Route                                     | Description                                    |
+| ------- | ----------------------------------------- | ---------------------------------------------- |
+| POST    | `/restaurants/new`                        | inscription d'un restaurant                    |
+| POST    | `/restaurants/login`                      | connexion                                      |
+| GET     | `/restaurants/all`                        | liste des restaurants                          |
+| GET     | `/restaurants/reserver/:slug`             | restaurant pour la page de réservation publique |
+| GET     | `/restaurants/:siret`                     | informations INSEE d'un établissement          |
+| PATCH   | `/restaurants/service/close-date/:id`     | fermer un service à une date                   |
+| PATCH   | `/restaurants/service/open-date/:id`      | rouvrir un service à une date                  |
+| DELETE  | `/restaurants/delete/:id`                 | supprimer un restaurant                        |
+| GET     | `/bookings/all/:restaurantId`             | réservations d'un restaurant                   |
+| POST    | `/bookings/new/:restaurantId`             | nouvelle réservation (rate-limitée)            |
+| PUT     | `/bookings/update/:bookingId`             | modification d'une réservation                 |
+| DELETE  | `/bookings/cancel/:bookingId`             | annulation                                     |
+| GET     | `/health`                                 | état du serveur et de la base                  |
 
-## ✨ Fonctionnalités
+## Installation
 
-### 🏪 Gestion des Restaurants
-
-- Création, lecture, mise à jour et suppression de restaurants
-- Gestion des informations : nom, slug, SIRET, adresse, téléphone, email
-- Gestion des horaires d'ouverture (par jour de la semaine)
-- Gestion des services proposés avec créneaux horaires
-- Gestion des dates de fermeture exceptionnelles
-- Écart (gap) entre deux réservations
-
-### 📅 Gestion des Réservations
-
-- Création de nouvelles réservations
-- Informations client : prénom, nom, email, téléphone
-- Date et heure de la réservation
-- Nombre de couvrets (nbPax)
-- Occasion spéciale (optionnelle)
-- Association à un restaurant
-
-### 📱 Notifications
-
-- Envoi de SMS via Twilio pour confirmation de réservation
-
-### 🛡️ Sécurité
-
-- **Rate Limiting** : 10 tentatives max par IP sur 10 minutes pour les nouvelles réservations
-- Protection CORS configurée pour plusieurs origines
-- Middleware de gestion d'erreurs
-- Validation des données avec express-validator
-
-### 📊 Health Check
-
-- Endpoint `/health` pour vérifier l'état du serveur
-- Vérification de la connexion à MongoDB
-- Status détaillé de la base de données
-
----
-
-## 🚀 Installation
-
-### Prérequis
-
-- [Node.js](https://nodejs.org/) (version 16 ou supérieure)
-- [Yarn](https://yarnpkg.com/) ou [npm](https://www.npmjs.com/)
-- [MongoDB Atlas](https://www.mongodb.com/atlas) (ou instance locale)
-- Compte [Twilio](https://www.twilio.com/) (optionnel pour les SMS)
-- Clés VAPID pour Web Push (optionnel)
-
-### Étapes
-
-1. **Cloner le dépôt**
-
-   ```bash
-   git clone https://github.com/dankysten/resaFacile-backend.git
-   cd resaFacile-backend
-   ```
-
-2. **Installer les dépendances**
-
-   ```bash
-   yarn install
-   # ou
-   npm install
-   ```
-
-3. **Configurer l'environnement**
-   Créer un fichier `.env` à la racine avec les variables suivantes :
-
-   ```env
-   CONNECTION_STRING=mongodb+srv://<user>:<password>@cluster0.XXXXXXX.mongodb.net/resaFacile
-   PORT=4000
-   FRONTEND_URL=http://localhost:3000
-
-   # Twilio (optionnel)
-   TWILIO_ACCOUNT_SID=<account_sid>
-   TWILIO_AUTH_TOKEN=<auth_token>
-   TWILIO_NUMBER=<phone_number>
-
-   # SIRENE API (optionnel)
-   SIRENE_API_KEY=<api_key>
-   ```
-
-4. **Lancer le serveur**
-
-   ```bash
-   # Mode développement
-   yarn dev
-   # ou
-   npm run dev
-
-   # Mode production
-   yarn start
-   # ou
-   npm start
-   ```
-
-5. **Accéder à l'API**
-   ```
-   🚀 Serveur lancé sur le port 4000
-   ```
-   L'API sera disponible à l'URL : `http://localhost:4000`
-
----
-
-## 📡 Endpoints API
-
-### 🔹 Base URL
-
-```
-http://localhost:4000
-```
-
-### 🔹 Restaurants
-
-| Méthode | Endpoint           | Description                       |
-| ------- | ------------------ | --------------------------------- |
-| GET     | `/restaurants`     | Récupère tous les restaurants     |
-| GET     | `/restaurants/:id` | Récupère un restaurant spécifique |
-| POST    | `/restaurants`     | Crée un nouveau restaurant        |
-| PUT     | `/restaurants/:id` | Met à jour un restaurant          |
-| DELETE  | `/restaurants/:id` | Supprime un restaurant            |
-
-### 🔹 Réservations
-
-| Méthode | Endpoint        | Description                                        |
-| ------- | --------------- | -------------------------------------------------- |
-| GET     | `/bookings`     | Récupère toutes les réservations                   |
-| GET     | `/bookings/:id` | Récupère une réservation spécifique                |
-| POST    | `/bookings/new` | Crée une nouvelle réservation (avec rate limiting) |
-| PUT     | `/bookings/:id` | Met à jour une réservation                         |
-| DELETE  | `/bookings/:id` | Supprime une réservation                           |
-
-### 🔹 SMS
-
-| Méthode | Endpoint | Description              |
-| ------- | -------- | ------------------------ |
-| POST    | `/sms`   | Envoie un SMS via Twilio |
-
-### 🔹 Health Check
-
-| Méthode | Endpoint  | Description                           |
-| ------- | --------- | ------------------------------------- |
-| GET     | `/health` | Vérifie l'état du serveur et de la DB |
-
----
-
-## 📁 Structure du Projet
-
-```
-resaFacile-backend/
-├── index.js                  # Point d'entrée
-├── app.js                    # Configuration Express et middlewares
-├── package.json             # Dépendances et scripts
-├── vercel.json              # Configuration Vercel
-├── .env                     # Variables d'environnement
-├── .gitignore               # Fichiers ignorés par Git
-│
-├── models/
-│   ├── connection.js        # Connexion à MongoDB
-│   ├── bookings.js          # Modèle Booking
-│   └── restaurants.js       # Modèle Restaurant
-│
-├── modules/
-│   └── utils.js             # Fonctions utilitaires
-│
-├── routes/
-│   ├── bookings.js          # Routes réservations
-│   ├── restaurants.js       # Routes restaurants
-│   └── sms.js               # Routes SMS
-│
-├── public/                  # Fichiers statiques
-│
-└── node_modules/            # Dépendances installées
-```
-
----
-
-## 🛡️ Configuration de Déploiement (Vercel)
-
-Le projet est configuré pour être déployé sur **Vercel** avec :
-
-- Runtime : Node.js
-- Serverless Functions : Activées
-- Configuration automatique via `vercel.json`
-
-**Pour déployer :**
-
-1. Pousser le code sur un dépôt GitHub
-2. Importer le projet sur Vercel
-3. Configurer les **Environment Variables** :
-   - `CONNECTION_STRING`
-   - `FRONTEND_URL`
-   - `TWILIO_ACCOUNT_SID` (optionnel)
-   - `TWILIO_AUTH_TOKEN` (optionnel)
-   - `TWILIO_NUMBER` (optionnel)
-   - `SIRENE_API_KEY` (optionnel)
-4. Déployer !
-
----
-
-## 📝 Exemples de Requêtes
-
-### Créer un restaurant
+Prérequis : Node.js 18+, [corepack](https://nodejs.org/api/corepack.html) (active la bonne version de Yarn), une base MongoDB (Atlas ou locale).
 
 ```bash
-curl -X POST http://localhost:4000/restaurants \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Le Bistrot Gourmand",
-    "slug": "le-bistrot-gourmand",
-    "siret": "12345678901234",
-    "address": "123 Rue de Paris",
-    "city": "Paris",
-    "zipCode": "75001",
-    "phoneNumber": "+33123456789",
-    "email": "contact@bistrot.com",
-    "password": "securePassword123",
-    "openingDays": ["lundi", "mardi", "mercredi", "jeudi", "vendredi"],
-    "gap": 30,
-    "services": [
-      {
-        "name": "Déjeuner",
-        "startTime": 540,
-        "endTime": 900,
-        "dayOfWeek": ["lundi", "mardi", "mercredi", "jeudi", "vendredi"]
-      }
-    ]
-  }'
+git clone https://github.com/romainauthier-1/resafacile-backend.git
+cd resafacile-backend
+corepack enable
+yarn install
+cp .env.example .env    # renseigner les variables ci-dessous
+yarn dev                # http://localhost:4000
 ```
 
-### Créer une réservation
+| Variable             | Rôle                                                      |
+| -------------------- | --------------------------------------------------------- |
+| `CONNECTION_STRING`  | chaîne de connexion MongoDB                               |
+| `FRONTEND_URL`       | origine du frontend autorisée par CORS (en production)    |
+| `SIRENE_API_KEY`     | clé de l'API SIRENE de l'INSEE                            |
+| `TWILIO_ACCOUNT_SID` · `TWILIO_AUTH_TOKEN` · `TWILIO_NUMBER` | identifiants Twilio pour l'envoi des SMS |
 
-```bash
-curl -X POST http://localhost:4000/bookings/new \
-  -H "Content-Type: application/json" \
-  -d '{
-    "customer": {
-      "firstName": "Jean",
-      "lastName": "Dupont",
-      "email": "jean@dupont.com",
-      "phoneNumber": "+33612345678"
-    },
-    "restaurant": "60d5ec9f8b3a8b0015f1b2a1",
-    "dateTime": "2024-08-15T20:00:00Z",
-    "nbPax": 4,
-    "occasion": "Anniversaire"
-  }'
+Sans identifiants Twilio, l'API démarre normalement : il suffit de décocher l'envoi de SMS dans le formulaire de réservation.
+
+## Structure
+
 ```
-
-### Envoyer un SMS
-
-```bash
-curl -X POST http://localhost:4000/sms \
-  -H "Content-Type: application/json" \
-  -d '{
-    "to": "+33612345678",
-    "message": "Votre réservation est confirmée !"
-  }'
+index.js          démarrage du serveur
+app.js            configuration Express : CORS, rate limiting, routes, gestion d'erreurs
+models/           connexion MongoDB, schémas Restaurant et Booking
+routes/           restaurants, bookings, sms (client Twilio)
+modules/          utilitaires
 ```
 
 ---
 
-## 🗄️ Modèles de Données
-
-### Restaurant
-
-```javascript
-{
-  name: String,           // Nom du restaurant
-  slug: String,           // URL unique
-  siret: String,          // Numéro SIRET
-  address: String,        // Adresse
-  city: String,           // Ville
-  zipCode: String,        // Code postal
-  phoneNumber: String,    // Téléphone
-  email: String,          // Email
-  password: String,       // Mot de passe haché
-  openingDays: [String],  // Jours d'ouverture
-  gap: Number,            // Écart entre réservations (minutes)
-  services: [             // Services proposés
-    {
-      name: String,
-      startTime: Number,   // Heure de début (minutes depuis minuit)
-      endTime: Number,     // Heure de fin
-      dayOfWeek: [String], // Jours de la semaine
-      isOpen: Boolean,
-      closedDates: [Date] // Dates de fermeture exceptionnelles
-    }
-  ]
-}
-```
-
-### Booking
-
-```javascript
-{
-  customer: {              // Informations client
-    firstName: String,
-    lastName: String,
-    email: String,
-    phoneNumber: String
-  },
-  restaurant: ObjectId,    // Référence au restaurant
-  dateTime: Date,          // Date et heure de la réservation
-  nbPax: Number,           // Nombre de personnes
-  occasion: String         // Occasion (optionnelle)
-}
-```
-
----
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à :
-
-- Ouvrir une issue pour signaler un bug ou proposer une amélioration
-- Forker le projet et soumettre une Pull Request
-
----
-
-## 📜 Licence
-
-Ce projet est sous licence **[MIT](https://opensource.org/licenses/MIT)**.
-
----
-
-## 👤 Auteur
-
-📌 **Romain Authier**  
-📧 [dankysten](https://github.com/dankysten)  
-💼 Développeur Fullstack junior (ancien restaurateur)
-
----
-
-> _"Une bonne réservation commence par une bonne organisation."_ 🍽️✨
+Romain Authier — [GitHub](https://github.com/romainauthier-1)
